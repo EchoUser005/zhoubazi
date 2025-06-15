@@ -1,0 +1,9 @@
+streamlit>=1.22.0
+fastapi>=0.95.0
+uvicorn>=0.21.0
+requests>=2.28.0
+pydantic>=2.0.0
+langchain-deepseek>=0.0.1
+langchain-core>=0.1.0
+geopy>=2.3.0
+sxtwl>=2.0.6 
