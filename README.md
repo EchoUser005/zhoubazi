@@ -11,7 +11,7 @@ pip install -r requirements.txt
 ## 运行应用
 
 ```bash
-python -m zhoubazi.run
+python -m run
 ```
 
 ## 使用流程
