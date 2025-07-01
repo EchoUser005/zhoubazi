@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 """
@@ -11,12 +11,18 @@ from typing import Optional
 
 class UserInput(BaseModel):
     """用户输入的原始信息"""
-    birth_time: str  # 出生时间，格式: YYYY-MM-DD HH:MM:SS
-    birth_location: str  # 出生地点，用于经纬度查询
+    birth_time: Optional[str] = Field(None, description="公历出生时间, 格式: YYYY-MM-DD HH:MM:SS")
+    birth_location: str = Field(..., description="出生地点, 格式: 省/市/区")
     name: Optional[str] = None  # 姓名，可选
     gender: str  # 性别，"男"或"女"
     isTai: Optional[bool] = None  # 是否胎身命，可选
-    city: Optional[str] = None  # 当前所在城市，可选，默认使用出生地
+    city: Optional[str] = None  # 当前所在城市，可选，不填则使用出生地
+
+    # 为农历输入添加新字段
+    is_lunar: bool = Field(False, description="是否为农历日期")
+    year: Optional[int] = None
+    month: Optional[int] = None
+    day: Optional[int] = None
 
 class BaziContext(BaseModel):
     """计算后的命盘上下文，用于传入模板"""
@@ -62,8 +68,10 @@ if __name__ == "__main__":
         birth_time="2001-12-23 13:00:00",
         birth_location="浙江省金华市", 
         name="示例用户",
-        gender="女"
+        gender="女",
+        city="北京市",
+        is_lunar=False
     )
-    print(f"\n用户输入示例:\n{example_user.dict()}")
+    print(f"\n用户输入示例:\n{example_user.model_dump()}")
 
 

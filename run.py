@@ -1,67 +1,97 @@
 import subprocess
-import threading
-import time
-import os
 import sys
-import webbrowser
+import os
+import time
 
-# 添加当前目录到系统路径
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
+def check_and_install_frontend_deps():
+    """Checks if node_modules exists in the app directory and runs 'npm install' if not."""
+    app_dir = os.path.join(os.path.dirname(__file__), 'app')
+    node_modules_path = os.path.join(app_dir, 'node_modules')
+    
+    if not os.path.exists(node_modules_path):
+        print("--- 前端依赖 'node_modules' 不存在，正在执行 'npm install'... ---")
+        try:
+            # 使用 shell=True 来正确处理 Windows 上的 npm.cmd
+            npm_install_process = subprocess.Popen('npm install', cwd=app_dir, shell=True)
+            npm_install_process.wait() # 等待安装完成
+            if npm_install_process.returncode == 0:
+                print("--- 前端依赖安装成功 ---")
+            else:
+                print(f"--- 前端依赖安装失败，返回码: {npm_install_process.returncode} ---")
+                sys.exit(1)
+        except Exception as e:
+            print(f"--- 执行 'npm install' 时出错: {e} ---")
+            sys.exit(1)
+    else:
+        print("--- 前端依赖 'node_modules' 已存在，跳过安装 ---")
 
-def run_backend():
-    """运行FastAPI后端服务"""
-    print("启动后端API服务...")
-    subprocess.run([sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"])
+def run():
+    """
+    Runs both the FastAPI backend and the Next.js frontend concurrently.
+    """
+    backend_command = [sys.executable, "main.py"]
+    frontend_command = "npm run dev"
 
-def run_frontend():
-    """运行Streamlit前端服务"""
-    print("启动前端服务...")
-    subprocess.run([
-        sys.executable, "-m", "streamlit", "run", "app.py", 
-        "--server.port", "8501", 
-        "--server.headless", "true",
-        "--browser.serverAddress", "localhost"
-    ])
+    app_dir = os.path.join(os.path.dirname(__file__), 'app')
 
-def main():
-    """主函数，启动所有服务"""
-    print("\n" + "="*50)
-    print("周运势分析系统启动中...")
-    print("="*50 + "\n")
-    
-    # 启动后端线程
-    backend_thread = threading.Thread(target=run_backend)
-    backend_thread.daemon = True
-    backend_thread.start()
-    
-    # 启动前端线程
-    frontend_thread = threading.Thread(target=run_frontend)
-    frontend_thread.daemon = True
-    frontend_thread.start()
-    
-    # 等待服务启动
-    print("等待服务启动，请稍候...")
-    time.sleep(5)  # 等待5秒，确保服务都已启动
-    
-    # 打开浏览器
-    print("正在打开浏览器访问前端页面...")
-    webbrowser.open("http://localhost:8501")
-    
-    # 保持主线程存活，以便daemon线程可以继续运行
-    print("\n" + "="*50)
-    print("系统已启动。后台服务正在运行中。")
-    print("如果浏览器没有自动打开，请手动访问 http://localhost:8501")
-    print("如需停止服务，请在本窗口按 Ctrl+C。")
-    print("="*50 + "\n")
-    
+    backend_process = None
+    frontend_process = None
+
     try:
-        # 让主线程等待，直到接收到Ctrl+C
-        while True:
+        print("--- 正在启动 FastAPI 后端服务... ---")
+        # 使用 subprocess.PIPE 来捕获输出
+        backend_process = subprocess.Popen(
+            backend_command, 
+            stdout=sys.stdout, 
+            stderr=sys.stderr,
+            cwd=os.path.dirname(__file__)
+        )
+        print(f"--- 后端服务已启动，进程 PID: {backend_process.pid} ---")
+        
+        # 给予后端一些启动时间
+        time.sleep(3)
+
+        print("--- 正在启动 Next.js 前端开发服务... ---")
+        # 对于npm命令，在Windows上使用shell=True是更可靠的方式
+        frontend_process = subprocess.Popen(
+            frontend_command, 
+            stdout=sys.stdout, 
+            stderr=sys.stderr,
+            cwd=app_dir, 
+            shell=True
+        )
+        print(f"--- 前端服务已启动，进程 PID: {frontend_process.pid} ---")
+
+        # 等待任一进程结束
+        while backend_process.poll() is None and frontend_process.poll() is None:
             time.sleep(1)
+
     except KeyboardInterrupt:
-        print("\n收到退出指令，正在关闭服务...")
-        print("服务已停止。")
+        print("\n--- 收到退出信号 (Ctrl+C)，正在关闭所有服务... ---")
+    
+    except Exception as e:
+        print(f"\n--- 发生错误: {e} ---")
+
+    finally:
+        if frontend_process and frontend_process.poll() is None:
+            print("--- 正在终止前端服务... ---")
+            # 在Windows上，需要用 taskkill 来终止 shell 启动的进程树
+            if sys.platform == "win32":
+                subprocess.call(['taskkill', '/F', '/T', '/PID', str(frontend_process.pid)])
+            else:
+                frontend_process.terminate()
+            frontend_process.wait()
+            print("--- 前端服务已关闭 ---")
+        
+        if backend_process and backend_process.poll() is None:
+            print("--- 正在终止后端服务... ---")
+            backend_process.terminate()
+            backend_process.wait()
+            print("--- 后端服务已关闭 ---")
+
+        print("\n--- 所有服务已成功关闭 ---")
+
 
 if __name__ == "__main__":
-    main() 
+    check_and_install_frontend_deps()
+    run() 

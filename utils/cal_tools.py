@@ -21,16 +21,17 @@ class BaziEngine:
         """初始化引擎"""
         self.TIAN_GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
         self.DI_ZHI = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-        self.geolocator = Nominatim(user_agent="bazi_calculator")
+        # 初始化地理位置查询器，并设置更长的超时时间（10秒）
+        self.geolocator = Nominatim(user_agent="bazi_analyzer_app/1.0", timeout=10) # type: ignore
 
     # 1. 公历转农历
     def convert_solar_to_lunar(self, solar_date: datetime) -> dict:
         """输入公历datetime对象，返回农历信息字典"""
         day = sxtwl.fromSolar(solar_date.year, solar_date.month, solar_date.day)
         
-        # 农历月名称
-        lunar_month_names = ['冬', '腊', '正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一']
-        lunar_month_name = lunar_month_names[day.getLunarMonth() % 12]
+        # 农历月名称 (修正版本)
+        lunar_month_names = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月']
+        lunar_month_name = ("闰" if day.isLunarLeap() else "") + lunar_month_names[day.getLunarMonth() - 1]
         
         # 农历日名称
         lunar_day_names = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
@@ -47,7 +48,7 @@ class BaziEngine:
             "month": day.getLunarMonth(),
             "day": day.getLunarDay(),
             "is_leap": day.isLunarLeap(),
-            "lunar_display": f"{day.getLunarYear()}年{lunar_month_name}月{lunar_day_name} {hour_zhi}时"
+            "lunar_display": f"{day.getLunarYear()}年{lunar_month_name}{lunar_day_name} {hour_zhi}时"
         }
 
     # 2. 农历转公历
@@ -87,9 +88,15 @@ class BaziEngine:
 
     # 4. 地理位置查经纬度
     def get_location_info(self, city_name: str) -> tuple[float, float]:
-        """输入城市名，利用geopy查询经纬度"""
-        location = self.geolocator.geocode(city_name)
-        return location.longitude, location.latitude
+        """输入城市名，利用geopy查询经纬度。如果找不到则抛出ValueError。"""
+        try:
+            location = self.geolocator.geocode(city_name)
+            if location is None:
+                raise ValueError(f"无法找到地理位置: '{city_name}'")
+            return location.longitude, location.latitude # type: ignore
+        except Exception as e:
+            # 捕获所有geopy可能抛出的异常，并统一向上抛出
+            raise ValueError(f"地理位置查询失败: {e}")
 
     # 5. 真太阳时计算
     def get_true_solar_time(self, solar_date: datetime, longitude: float) -> datetime:
@@ -158,9 +165,9 @@ class BaziEngine:
         hour_index = (dt.hour + 1) // 2 % 12
         hour_zhi = self.DI_ZHI[hour_index]
         
-        # 农历月名称
-        lunar_month_names = ['冬', '腊', '正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一']
-        lunar_month_name = lunar_month_names[lunar_month % 12]
+        # 农历月名称 (修正版本)
+        lunar_month_names = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月']
+        lunar_month_name = ("闰" if day.isLunarLeap() else "") + lunar_month_names[lunar_month - 1]
         
         # 农历日名称
         lunar_day_names = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
@@ -189,9 +196,9 @@ class BaziEngine:
         hour_index = (dt.hour + 1) // 2 % 12
         hour_zhi = self.DI_ZHI[hour_index]
         
-        # 农历月名称(仅用于显示，不是原始数据)
-        lunar_month_names = ['冬', '腊', '正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一']
-        lunar_month_name = lunar_month_names[lunar_month % 12]
+        # 农历月名称(仅用于显示，不是原始数据) (修正版本)
+        lunar_month_names = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月']
+        lunar_month_name = ("闰" if is_leap else "") + lunar_month_names[lunar_month - 1]
         
         # 农历日名称(仅用于显示，不是原始数据)
         lunar_day_names = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
@@ -234,37 +241,75 @@ class BaziEngine:
         # 性别转换 (1为男, 0为女)
         py_gender = 1 if gender == "男" else 0
         
-        # 计算起运时间：男命三天一岁，女命四天一岁
-        days_per_year = 3 if py_gender == 1 else 4
-        
         # 获取年干支
         year_gz = day.getYearGZ()
         
         # 判断顺逆：阳年男、阴年女顺排，阴年男、阳年女逆排
-        # 天干奇数为阳，偶数为阴
+        # 天干-甲(0)乙(1)丙(2)丁(3)戊(4)己(5)庚(6)辛(7)壬(8)癸(9)
+        # 阳：甲丙戊庚壬 (偶数)
+        # 阴：乙丁己辛癸 (奇数)
         is_forward = (year_gz.tg % 2 == 0 and py_gender == 1) or (year_gz.tg % 2 == 1 and py_gender == 0)
         
-        # 根据出生时辰计算起运岁数
-        # 这里用简化算法：出生时刻到下一个节令的天数
-        birth_hour = true_solar_time.hour
+        # 查找上一个或下一个节令
+        jieqi_day = None
+        # 节令的索引: 小寒(1), 立春(3), 惊蛰(5), 清明(7), 立夏(9), 芒种(11), 小暑(13), 立秋(15), 白露(17), 寒露(19), 立冬(21), 大雪(23)
+        JIE_QI_INDEXES = {1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23}
         
-        # 简化：假设平均每个月30天，近似计算距离下一节令的天数
-        # 实际应该计算出下一个节令的具体日期
-        days_to_next_jieqi = 15  # 假设平均15天到下一节令
-        start_year = (days_to_next_jieqi * days_per_year) / 30 
-        start_month = int(start_year * 12) % 12
-        start_day = int((start_year * 365) % 30)
+        # 临时用的day对象，用于循环查找
+        temp_day = day
+        if is_forward:
+            # 顺排，找下一个节令
+            while True:
+                temp_day = temp_day.after(1)
+                if temp_day.hasJieQi() and temp_day.getJieQi() in JIE_QI_INDEXES:
+                    jieqi_day = temp_day
+                    break
+        else:
+            # 逆排，找上一个节令
+            # 先检查出生当天是不是节令
+            if day.hasJieQi() and day.getJieQi() in JIE_QI_INDEXES:
+                # 如果是，则找它之前的节令
+                 temp_day = day.before(1)
+            while True:
+                if temp_day.hasJieQi() and temp_day.getJieQi() in JIE_QI_INDEXES:
+                    jieqi_day = temp_day
+                    break
+                temp_day = temp_day.before(1)
+
+        # 获取节令的精确时间
+        jd = jieqi_day.getJieQiJD()
+        jieqi_time_info = sxtwl.JD2DD(jd)
+        jieqi_datetime = datetime(
+            int(jieqi_time_info.Y), int(jieqi_time_info.M), int(jieqi_time_info.D),
+            int(jieqi_time_info.h), int(jieqi_time_info.m), int(round(jieqi_time_info.s))
+        )
+
+        # 计算时间差
+        time_diff = abs(jieqi_datetime - true_solar_time)
+
+        # 3天=1岁, 1天=4个月, 1小时=5天
+        days_diff = time_diff.total_seconds() / (3600 * 24)
         
+        # 计算起运岁数
+        qiyun_years_float = days_diff / 3
+        
+        qiyun_year = int(qiyun_years_float)
+        
+        # 计算剩余天数，换算成月和日
+        remaining_days_after_years = (qiyun_years_float - qiyun_year) * 360 # 按一年360天算
+        qiyun_month = int(remaining_days_after_years / 30)
+        qiyun_day = int(remaining_days_after_years % 30)
+
         # 返回原始数据，不包含固定业务拼接字符串（如"起运"或"上大运"）
         qiyun_raw = {
-            "year": int(start_year), 
-            "month": start_month, 
-            "day": start_day
+            "year": qiyun_year,
+            "month": qiyun_month,
+            "day": qiyun_day
         }
         
         # 交运时间
-        jiaoyun_year = birth_time.year + int(start_year)
-        jiaoyun_month = birth_time.month + start_month
+        jiaoyun_year = birth_time.year + qiyun_year
+        jiaoyun_month = birth_time.month + qiyun_month
         # 处理月份溢出
         while jiaoyun_month > 12:
             jiaoyun_month -= 12
@@ -348,7 +393,7 @@ class BaziEngine:
         }
         
         for i in range(10):  # 计算10步大运
-            age_start = int(start_year) + i * 10
+            age_start = qiyun_year + i * 10
             year_start = birth_time.year + age_start
             
             # 根据顺逆计算月柱偏移
@@ -455,6 +500,21 @@ if __name__ == '__main__':
     print("\n" + "="*50)
     print("八字引擎 BaziEngine 功能测试")
     print("="*50)
+
+    # 大运计算专项测试
+    print("\n" + "*"*10 + " 大运计算专项测试 " + "*"*10)
+    print(f"输入信息: {birth_time_str}, 性别: {gender}, 城市: {city}")
+    try:
+        result = engine.calculate_dayun(birth_time, gender, city)
+        qiyun = result.get('qiyun_data', {})
+        dayun_list = result.get('dayun_list', [])
+        print(f"起运时间: {qiyun.get('year')}年 {qiyun.get('month')}月 {qiyun.get('day')}日")
+        if dayun_list:
+            first_dayun = dayun_list[0]
+            print(f"第一步大运: {first_dayun.get('age')}岁 ({first_dayun.get('year')}年) {first_dayun.get('ganzhi')} {first_dayun.get('ming_li')}")
+    except Exception as e:
+        print(f"大运计算测试失败: {e}")
+    print("*"*34)
     
     # 1. 公历转农历
     print("\n1. convert_solar_to_lunar 原始返回值:")
