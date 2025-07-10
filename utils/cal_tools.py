@@ -22,7 +22,7 @@ class BaziEngine:
         self.TIAN_GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
         self.DI_ZHI = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
         # 初始化地理位置查询器，并设置更长的超时时间（10秒）
-        self.geolocator = Nominatim(user_agent="bazi_analyzer_app/1.0", timeout=10) # type: ignore
+        self.geolocator = Nominatim(user_agent="bazi_analyzer_app/1.0", timeout=10, proxies=None) # type: ignore
 
     # 1. 公历转农历
     def convert_solar_to_lunar(self, solar_date: datetime) -> dict:
@@ -107,12 +107,8 @@ class BaziEngine:
         true_solar_time = solar_date + timedelta(minutes=time_diff_minutes)
         return true_solar_time
 
-    # 7. 四柱排盘 (合并了真太阳时计算)
-    def calculate_bazi(self, birth_time: datetime, city_name: str) -> dict:
-        """输入公历生日和城市名，自动计算真太阳时并排出四柱"""
-        longitude, _ = self.get_location_info(city_name)
-        true_solar_time = self.get_true_solar_time(birth_time, longitude)
-
+    def _calculate_bazi_from_tst(self, true_solar_time: datetime) -> dict:
+        """核心排盘逻辑：根据真太阳时计算四柱。"""
         # 使用校正后的时间排盘
         day = sxtwl.fromSolar(true_solar_time.year, true_solar_time.month, true_solar_time.day)
         
@@ -138,13 +134,22 @@ class BaziEngine:
         hour_gan_index = (day_gan_index % 5 * 2 + hour_zhi_index % 12) % 10
         hour_gan = self.TIAN_GAN[hour_gan_index]
 
-        bazi = {
-            "true_solar_time": true_solar_time.strftime('%Y-%m-%d %H:%M:%S'),
+        return {
             "year_pillar": f"{year_gan}{year_zhi}",
             "month_pillar": f"{month_gan}{month_zhi}",
             "day_pillar": f"{day_gan}{day_zhi}",
             "hour_pillar": f"{hour_gan}{hour_zhi}"
         }
+
+    # 7. 四柱排盘 (合并了真太阳时计算)
+    def calculate_bazi(self, birth_time: datetime, city_name: str) -> dict:
+        """输入公历生日和城市名，自动计算真太阳时并排出四柱"""
+        longitude, _ = self.get_location_info(city_name)
+        true_solar_time = self.get_true_solar_time(birth_time, longitude)
+
+        bazi = self._calculate_bazi_from_tst(true_solar_time)
+        bazi["true_solar_time"] = true_solar_time.strftime('%Y-%m-%d %H:%M:%S')
+        
         return bazi
 
     # 需要添加一个辅助方法获取农历干支时间字符串
@@ -232,10 +237,10 @@ class BaziEngine:
         longitude, _ = self.get_location_info(city_name)
         true_solar_time = self.get_true_solar_time(birth_time, longitude)
         
-        # 计算四柱先
-        bazi_info = self.calculate_bazi(birth_time, city_name)
+        # 核心修正：直接从真太阳时计算八字，确保数据一致性
+        bazi_info = self._calculate_bazi_from_tst(true_solar_time)
         
-        # 获取出生当天信息
+        # 获取出生当天信息 (使用校准后的真太阳时)
         day = sxtwl.fromSolar(true_solar_time.year, true_solar_time.month, true_solar_time.day)
         
         # 性别转换 (1为男, 0为女)

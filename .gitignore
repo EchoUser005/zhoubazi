@@ -1,0 +1,18 @@
+# Environments
+.env
+.venv
+env/
+venv/
+
+# IDE / Editor specific
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/ 

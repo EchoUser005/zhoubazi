@@ -1,16 +1,25 @@
 import logging
 from langchain_deepseek import ChatDeepSeek
 import os
-import getpass
+from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
 from schemas import BaziContext 
 from prompt.context_builder import BaziContextBuilder
 from schemas import UserInput
 
+# Load environment variables from a .env file at the very top
+load_dotenv()
+
 logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO').upper(), format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Check for API key after loading .env. If not found, raise a clear error.
 if not os.getenv("DEEPSEEK_API_KEY"):
-    os.environ["DEEPSEEK_API_KEY"] = getpass.getpass("输入你的DeepSeek API key: ")
+    raise ValueError(
+        "错误: DEEPSEEK_API_KEY 未在环境变量中设置。\n"
+        "请遵循以下步骤:\n"
+        "1. 在项目根目录中, 将 .env.example 文件复制一份并重命名为 .env\n"
+        "2. 打开 .env 文件, 将 'YOUR_DEEPSEEK_API_KEY_HERE' 替换为您的有效API密钥。"
+    )
 
 
 try:
