@@ -10,7 +10,6 @@ import json
 from schemas import BaziContext
 from utils.prompt_utils import load_prompt_split
 from utils.llm_router import LLMRouter
-from utils.tracing import trace_agent_action
 
 # 加载环境变量（支持 GEMINI_API_KEY / GOOGLE_API_KEY）
 load_dotenv()
@@ -28,7 +27,7 @@ class FortuneScoreAgent:
     - 读取 prompt/predict_fortune.md
     - 使用 LLMRouter 调用 Gemini Flash（gemini-2.5-flash）
     - 由调用方显式传入 dimension，其余模板变量由内部处理
-    - 仅当 dimension == '流日' 时，other_info 注入“流日干支：{X}日”，否则为空
+    - 仅当 dimension == '流日' 时，other_info 注入"流日干支：{X}日"，否则为空
     """
     def __init__(
         self,
@@ -92,7 +91,6 @@ class FortuneScoreAgent:
         )
         return [("system", system_text), ("human", user_text)]
 
-    @trace_agent_action(name="predict_fortune_scores", agent_type="fortune_score")
     def predict_scores(self, context: BaziContext, dimension: str) -> dict:
         """
         同步获取结构化打分结果（返回 dict: {emotion, health, wealth}，均为整数）

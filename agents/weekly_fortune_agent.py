@@ -6,7 +6,6 @@ from langchain_core.prompts import PromptTemplate
 
 from schemas import BaziContext
 from utils.llm_router import LLMRouter
-from utils.tracing import trace_agent_action
 
 load_dotenv()
 logging.basicConfig(
@@ -69,13 +68,11 @@ class WeeklyFortuneAgent:
         return [("system", system_message), ("human", user_message)]
 
     # 同步整段输出
-    @trace_agent_action(name="generate_fortune_report", agent_type="weekly_fortune")
     def generate_report(self, context: BaziContext) -> str:
         messages = self._build_messages(context)
         return self.router.invoke(messages)
 
     # 流式输出（生成器）
-    @trace_agent_action(name="stream_fortune_report", agent_type="weekly_fortune")
     def stream_report(self, context: BaziContext) -> Iterator[str]:
         messages = self._build_messages(context)
         return self.router.stream(messages)
