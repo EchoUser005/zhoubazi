@@ -10,7 +10,7 @@ from utils.cal_tools import BaziEngine
 
 """
 计划:
-1. 实现get_calendare方法生成当前日期所在周和下周的干支历 
+1. 实现get_calendar方法生成当前日期所在周和下周的干支历 
 2. 修正BaziContext字段与system_prompt变量匹配
 3. 完善build_context方法确保所有提示词变量正确填充
 """
@@ -82,7 +82,8 @@ class BaziContextBuilder:
         lunar_info = self.engine.convert_solar_to_lunar(current_time)
         # weekday_names = ["一", "二", "三", "四", "五", "六", "日"]
         # weekday = weekday_names[current_time.weekday()]
-        nowtime = f"{current_ganzhi['year_ganzhi']}年{current_ganzhi['month_ganzhi']}月{lunar_info['day']}日"
+        # 修改为当前流年流月,避免过度分析今天
+        nowtime_month = f"{current_ganzhi['year_ganzhi']}年{current_ganzhi['month_ganzhi']}月"
         calendar = self.get_calendar()
 
         dayun_info = self.engine.calculate_dayun(birth_time, user_info.gender, user_info.birth_location)
@@ -103,7 +104,7 @@ class BaziContextBuilder:
         jiaoyun_time = f"逢丙、辛年 {jiaoyun_data['year']}年{jiaoyun_data['month']}月交大运"
         
         return BaziContext(
-            nowtime=nowtime,
+            nowtime=nowtime_month,
             calendar=calendar,
             name=user_info.name if user_info.name else "",
             gender=user_info.gender,
@@ -135,7 +136,7 @@ if __name__ == "__main__":
     builder = BaziContextBuilder()
     
     # 测试get_calendare方法
-    print("\n1. get_calendare 方法测试:")
+    print("\n1. get_calendar 方法测试:")
     calendar = builder.get_calendar()
     print(f"未来两周日历:\n{calendar}")
     
@@ -145,7 +146,7 @@ if __name__ == "__main__":
     
     # 打印所有字段，检查是否与system_prompt.txt中的变量匹配
     print("\n3. 生成的上下文字段:")
-    # print(f"nowtime: {context.nowtime}")
+    print(f"nowtime_month: {context.nowtime}")
     print(f"calendar (前3行):")
     calendar_lines = context.calendar.split('\n')
     for i in range(min(3, len(calendar_lines))):

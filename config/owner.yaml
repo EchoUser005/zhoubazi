@@ -1,0 +1,21 @@
+# 命主配置（与 schemas.UserInput 对齐）
+# - 默认使用公历：is_lunar=false + birth_time（YYYY-MM-DD HH:MM:SS）
+# - 如用农历：注释掉公历部分，启用“农历输入示例”块（is_lunar=true + year/month/day）
+
+name: "张三"
+gender: "女"                        # 取值："男" 或 "女"
+birth_location: "浙江省/金华市/婺城区"  # 建议格式：省/市/区
+city: "北京市"                      # 可选，不填则使用出生地
+isTai: false                       # 是否胎身命，可选
+
+# 公历输入（默认启用）
+is_lunar: false
+birth_time: "2001-12-23 13:00:00"  # 公历出生时间，建议精确到分钟/秒
+
+# 农历输入示例（若采用农历，请启用下面三行并将上面的 is_lunar 设为 true；birth_time 可省略）
+# is_lunar: true
+# year: 2001
+# month: 11
+# day: 9
+
+bazi: ""  # 预留：用户可手动填写八字（年 月 日 时），当前版本不会读取该项，仅作占位提醒

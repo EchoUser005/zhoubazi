@@ -77,7 +77,7 @@
 {nowtime}
 
 
-- 本周一至下周日干支历：
+- 本周一至周日干支历：
 
 {calendar}
 
@@ -97,7 +97,9 @@
 - 四柱
 {bazi}
 - 大运
-> 起运：{dayun_time}
+{dayun_time}
+
+> 起运：{qiyun_time}
 > 交运：{jiaoyun_time}
 
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import Sidebar from "@/components/Sidebar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,11 +18,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className={`${inter.className} bg-gray-50 dark:bg-gray-900`}>
-        <main className="container mx-auto min-h-screen p-4 sm:p-8">
-          {children}
-        </main>
-        <Toaster richColors />
+      <body className={`${inter.className} bg-black text-white`}>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 px-6 py-6">
+            {children}
+            <Toaster richColors />
+          </main>
+        </div>
       </body>
     </html>
   );
