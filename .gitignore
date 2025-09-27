@@ -7,6 +7,8 @@ venv/
 # IDE / Editor specific
 .vscode/
 .idea/
+.qoder/
+.vscode/
 
 # Python cache
 __pycache__/
@@ -16,3 +18,6 @@ __pycache__/
 build/
 dist/
 *.egg-info/ 
+
+# Project documentation (private)
+prd.md
