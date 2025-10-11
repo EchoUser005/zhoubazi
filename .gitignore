@@ -1,6 +1,7 @@
 # Environments
-.env
+utils/.env
 .venv
+claude-code-router/
 env/
 venv/
 
@@ -21,3 +22,5 @@ dist/
 
 # Project documentation (private)
 prd.md
+trd.md
+CLAUDE.md

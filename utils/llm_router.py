@@ -1,11 +1,21 @@
 from typing import Iterator, List, Tuple, Union, Optional
 import os
-
+import uuid
+from langfuse import Langfuse,observe
 from langchain_deepseek import ChatDeepSeek
 from langchain_google_genai import ChatGoogleGenerativeAI
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 Message = Tuple[str, str]
 Messages = List[Message]
+langfuse = Langfuse(
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    host=os.getenv("LANGFUSE_HOST")
+)
 
 class LLMRouter:
     """
@@ -58,21 +68,34 @@ class LLMRouter:
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
-
     def invoke(self, messages: Union[str, Messages]) -> str:
+        trace_id = uuid.uuid4().hex
+        return self._invoke(messages=messages, user_id="admin", langfuse_trace_id=trace_id)
+
+    @observe(name="invoke")
+    def _invoke(self, messages: Union[str, Messages], user_id: str) -> str:
         msgs = self._normalize_messages(messages)
         result = self.llm.invoke(msgs)
         return getattr(result, "content", str(result))
 
-
     def stream(self, messages: Union[str, Messages]) -> Iterator[str]:
+        trace_id = uuid.uuid4().hex
+        yield from self._stream(messages=messages, user_id="admin", langfuse_trace_id=trace_id)
+
+    @observe(name="stream")
+    def _stream(self, messages: Union[str, Messages], user_id: str) -> Iterator[str]:
         msgs = self._normalize_messages(messages)
         for chunk in self.llm.stream(msgs):
             if hasattr(chunk, "content") and isinstance(chunk.content, str):
                 yield chunk.content
 
-    # 新增：思考模型调用，返回 reasoning + content
     def invoke_reasoning(self, messages: Union[str, Messages]) -> dict:
+        trace_id = uuid.uuid4().hex
+        return self._invoke_reasoning(messages=messages, user_id="admin", langfuse_trace_id=trace_id)
+
+    @observe(name="invoke_reasoning")
+    # 新增：思考模型调用，返回 reasoning + content
+    def _invoke_reasoning(self, messages: Union[str, Messages], user_id: str) -> dict:
         """
         调用“思考模型”，返回：
         {
