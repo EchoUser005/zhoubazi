@@ -1,6 +1,6 @@
 "use client";
-
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { regionData, codeToText } from "element-china-area-data";
@@ -12,17 +12,14 @@ export function useLingxun() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [time, setTime] = useState("12:00:00");
   const [isLunar, setIsLunar] = useState(false);
-
   const [lunarYear, setLunarYear] = useState(new Date().getFullYear());
   const [lunarMonth, setLunarMonth] = useState(1);
   const [lunarDay, setLunarDay] = useState(1);
-
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedArea, setSelectedArea] = useState("");
   const [cities, setCities] = useState<{ value: string; label: string; children?: any[] }[]>([]);
   const [areas, setAreas] = useState<{ value: string; label: string }[]>([]);
-
   const [result, setResult] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -79,7 +76,6 @@ export function useLingxun() {
     setName(entry.name);
     setGender(entry.gender);
     setIsLunar(entry.is_lunar);
-
     if (entry.is_lunar) {
       setLunarYear(entry.year!);
       setLunarMonth(entry.month!);
@@ -90,7 +86,6 @@ export function useLingxun() {
       setDate(dateTime);
       setTime(format(dateTime, "HH:mm:ss"));
     }
-
     if (entry.province_code) {
       handleProvinceChange(entry.province_code);
       if (entry.city_code) {
@@ -111,82 +106,137 @@ export function useLingxun() {
       return;
     }
 
+    let payload: any;
     const commonPayload = {
       name: name || "未填写",
       gender,
       birth_location: `${codeToText[selectedProvince]}/${codeToText[selectedCity]}/${codeToText[selectedArea]}`,
     };
 
-    let payload: any;
     if (isLunar) {
-      payload = { ...commonPayload, is_lunar: true, year: lunarYear, month: lunarMonth, day: lunarDay, birth_time: time };
+      payload = {
+        ...commonPayload,
+        is_lunar: true,
+        year: lunarYear,
+        month: lunarMonth,
+        day: lunarDay,
+        birth_time: time,
+      };
     } else {
       if (!date) {
         toast.error("请选择公历出生日期");
         return;
       }
-      payload = { ...commonPayload, is_lunar: false, birth_time: `${format(date, "yyyy-MM-dd")} ${time}` };
+      payload = {
+        ...commonPayload,
+        is_lunar: false,
+        birth_time: `${format(date, "yyyy-MM-dd")} ${time}`,
+      };
     }
 
     setIsLoading(true);
     setResult("");
+    saveHistory(payload);
 
-    const promise = () =>
-      new Promise(async (resolve, reject) => {
-        try {
-          const response = await fetch("http://127.0.0.1:8000/analyze/stream", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: "无法解析错误信息" }));
-            reject(new Error((errorData as any).detail || `HTTP 错误! 状态码: ${response.status}`));
-            return;
-          }
-          saveHistory(payload);
-          const reader = response.body?.getReader();
-          if (!reader) {
-            reject(new Error("无法获取响应读取器"));
-            return;
-          }
-          const decoder = new TextDecoder();
-          let done = false;
-          while (!done) {
-            const { value, done: readerDone } = await reader.read();
-            done = readerDone;
-            const chunk = decoder.decode(value, { stream: true });
-            setResult((prev) => prev + chunk);
-          }
-          resolve("分析完成");
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : "发生了未知错误";
-          reject(errorMessage);
-        } finally {
-          setIsLoading(false);
-        }
+    try {
+      console.log("[handleAnalysis] 开始请求");
+
+      const response = await fetch("http://127.0.0.1:8000/analyze/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-    toast.promise(promise, {
-      loading: "正在请求AI大师分析中...",
-      success: "分析已完成！",
-      error: (err) => `分析失败: ${err}.`,
-    });
+      console.log("[handleAnalysis] 收到响应头, 状态:", response.status);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("无法获取reader");
+      }
+
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let chunkCount = 0;
+      let firstChunk = true;  // ✅ 关键：标记是否收到第一个chunk
+
+      console.log("[handleAnalysis] 开始读取 chunks");
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          console.log(`[handleAnalysis] ✅ 完成! 共 ${chunkCount} chunks`);
+          break;
+        }
+
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          chunkCount++;
+
+          console.log(`[handleAnalysis] chunk ${chunkCount}: ${chunk.substring(0, 50)}`);
+
+          fullText += chunk;
+
+          // ✅ 使用 flushSync 强制同步更新，确保每个chunk都立即渲染
+          flushSync(() => {
+            setResult(fullText);
+          });
+
+          // ✅ 关键：收到第一个 chunk 时立即关闭加载状态
+          if (firstChunk) {
+            firstChunk = false;
+            flushSync(() => {
+              setIsLoading(false);
+            });
+            console.log("[handleAnalysis] 🎉 收到第一个chunk，取消加载状态");
+          }
+        }
+      }
+
+      setIsLoading(false);  // 最后保险地关闭一次
+      toast.success("分析已完成！");
+      console.log("[handleAnalysis] 全部完成");
+    } catch (err) {
+      setIsLoading(false);
+      const errorMessage = err instanceof Error ? err.message : "未知错误";
+      console.error("[handleAnalysis] 错误:", errorMessage);
+      toast.error(`分析失败: ${errorMessage}`);
+    }
   };
 
   return {
-    name, setName,
-    gender, setGender,
-    date, setDate,
-    time, setTime,
-    isLunar, setIsLunar,
-    lunarYear, setLunarYear,
-    lunarMonth, setLunarMonth,
-    lunarDay, setLunarDay,
-    selectedProvince, selectedCity, selectedArea,
-    cities, areas,
-    result, isLoading, history,
-    handleProvinceChange, handleCityChange,
-    handleAnalysis, fillFromHistory, setSelectedArea,
+    name,
+    setName,
+    gender,
+    setGender,
+    date,
+    setDate,
+    time,
+    setTime,
+    isLunar,
+    setIsLunar,
+    lunarYear,
+    setLunarYear,
+    lunarMonth,
+    setLunarMonth,
+    lunarDay,
+    setLunarDay,
+    selectedProvince,
+    selectedCity,
+    selectedArea,
+    cities,
+    areas,
+    result,
+    isLoading,
+    history,
+    handleProvinceChange,
+    handleCityChange,
+    handleAnalysis,
+    fillFromHistory,
+    setSelectedArea,
   };
 }

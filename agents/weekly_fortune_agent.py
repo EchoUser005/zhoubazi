@@ -1,6 +1,7 @@
+
 import os
 import logging
-from typing import Iterator, Optional
+from typing import AsyncIterator, Optional
 from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
 
@@ -26,25 +27,20 @@ prompt_template = PromptTemplate.from_template(_template_string)
 
 
 class WeeklyFortuneAgent:
-    """
-    周运势分析 Agent
-    - 封装了与 LLM 的交互（同步/流式）
-    - 通过 LLMRouter 统一管理 Gemini / DeepSeek
-    """
+    """周运势分析 Agent - 异步流式版本"""
 
     def __init__(
-        self,
-        router: Optional[LLMRouter] = None,
-        provider: Optional[str] = None,
-        model: Optional[str] = None,
-        temperature: float = 0.5,
-        timeout: int = 600,
-        max_retries: int = 3,
+            self,
+            router: Optional[LLMRouter] = None,
+            provider: Optional[str] = None,
+            model: Optional[str] = None,
+            temperature: float = 0.5,
+            timeout: int = 600,
+            max_retries: int = 3,
     ):
-        # 允许从外部注入 router，便于测试；否则按全局配置创建
         self.router = router or LLMRouter(
-            provider=provider or os.getenv("LLM_PROVIDER", "gemini"),
-            model=model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            provider=provider or os.getenv("LLM_PROVIDER", "deepseek"),
+            model=model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
             temperature=temperature,
             timeout=timeout,
             max_retries=max_retries,
@@ -61,18 +57,16 @@ class WeeklyFortuneAgent:
             city=context.city,
             bazi=context.bazi,
             dayun_time=context.dayun_time,
-            qiyun_time=getattr(context, "qiyun_time", ""),  # 兜底，避免 KeyError
+            qiyun_time=getattr(context, "qiyun_time", ""),
             jiaoyun_time=context.jiaoyun_time,
         )
         user_message = "请严格按照规则所示的输出格式生成分析报告，不要输出任何无关字符"
         return [("system", system_message), ("human", user_message)]
 
-    # 同步整段输出
     def generate_report(self, context: BaziContext) -> str:
         messages = self._build_messages(context)
         return self.router.invoke(messages)
 
-    # 流式输出（生成器）
-    def stream_report(self, context: BaziContext) -> Iterator[str]:
+    def stream_report(self, context):
         messages = self._build_messages(context)
         return self.router.stream(messages)

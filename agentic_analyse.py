@@ -33,8 +33,8 @@ class LLM_Chat:
     def __init__(self):
 
         self.router = LLMRouter(
-            provider=os.getenv("LLM_PROVIDER", "gemini"),# gemini deepseek
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),# gemini-2.5-flash deepseek-chat
+            provider=os.getenv("LLM_PROVIDER", "deepseek"),# gemini deepseek
+            model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),# gemini-2.5-flash deepseek-chat
             temperature=0.5,
             timeout=600,
             max_retries=3,

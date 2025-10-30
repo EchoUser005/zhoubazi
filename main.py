@@ -1,4 +1,6 @@
+import asyncio
 import uvicorn
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,16 +11,21 @@ from pydantic import BaseModel
 from agents.fortune_score_agent import FortuneScoreAgent
 from services.get_fortune_score import get_fortune_score, OwnerConfigNotFound
 from utils.config_loader import load_owner_user_input, save_owner_user_input
+import logging
+import time
 
-"""
-1. 定义接口，接收原始用户输入的参数模型UserInput 
-2. 定义输出，直接返回AI分析结果文本
-3. 运行逻辑：
-    1. 接收用户输入的参数
-    2. 调用context_builder.py中的build_context方法，生成BaziContext
-    3. 调用agentic_analyse.py中的ai_chat方法，生成分析结果
-    4. 直接返回AI生成的分析文本
-"""
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("app.log")
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+executor = ThreadPoolExecutor(max_workers=4)
 
 app = FastAPI(
     title="周运势分析API",
@@ -26,15 +33,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允许所有来源，生产环境应该限制
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 agent = WeeklyFortuneAgent()
 context_builder = BaziContextBuilder()
@@ -45,90 +50,161 @@ fortune_agent = FortuneScoreAgent()
 def read_root():
     return {"message": "周运势分析API", "version": "1.0.1"}
 
+
 class FortunePredictInput(UserInput):
-    """
-    在现有 UserInput 的基础上新增一个显式的 dimension 字段：
-    取值示例：'大运' | '流年' | '流月' | '流日'
-    """
     dimension: str
+
 
 @app.post("/analyze")
 async def analyze_bazi(request: UserInput):
-    """
-    运势分析接口 - 同步方式
-    """
+    """运势分析接口 - 同步方式"""
     try:
-        context = context_builder.build_context(request)
-        analysis_text = agent.generate_report(context)
+        loop = asyncio.get_event_loop()
+        context = await loop.run_in_executor(None, context_builder.build_context, request)
+        analysis_text = await loop.run_in_executor(None, agent.generate_report, context)
         return {"result": analysis_text}
     except Exception as e:
+        logger.error(f"[/analyze] 错误: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
+
 
 @app.post("/predict_fortune")
 async def predict_fortune(request: FortunePredictInput):
-    """
-    运势预测打分接口 - 同步方式
-    - 调用方显式传入 dimension
-    - 其他变量（包括 other_info）由服务端内部处理
-    - 仅当 dimension == '流日' 时，other_info 自动注入“流日干支：{X}日”
-    """
+    """运势预测打分接口 - 同步方式"""
     try:
-        # 将扩展模型转回基础的 UserInput 构建上下文
+        loop = asyncio.get_event_loop()
         base_user = UserInput(**request.model_dump(exclude={"dimension"}))
-        context = context_builder.build_context(base_user)
-        result = fortune_agent.predict_scores(context, dimension=request.dimension)
+        context = await loop.run_in_executor(None, context_builder.build_context, base_user)
+        result = await loop.run_in_executor(
+            None,
+            lambda: fortune_agent.predict_scores(context, dimension=request.dimension)
+        )
         return {"result": result}
     except Exception as e:
+        logger.error(f"[/predict_fortune] 错误: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
+
 
 @app.post("/analyze/stream")
 async def analyze_bazi_sse(request: UserInput):
-    """
-    运势分析接口 - 流式方式
-    """
     try:
-        context = context_builder.build_context(request)
-        return StreamingResponse(agent.stream_report(context), media_type="text/plain")
+        logger.info("[/analyze/stream] 请求开始")
+        start = time.time()
+
+        loop = asyncio.get_event_loop()
+
+        # logger.info("[/analyze/stream] 开始构建上下文")
+        # ctx_start = time.time()
+        context = await loop.run_in_executor(executor, context_builder.build_context, request)
+        # logger.info(f"[/analyze/stream] 上下文构建完成，耗时 {time.time() - ctx_start:.2f}s")
+
+        async def stream_generator():
+            """
+            关键：处理同步生成器（stream_report）
+            在线程池中逐块读取，实时 yield 给客户端
+            """
+            logger.info("[stream_generator] 开始流式生成")
+            stream_start = time.time()
+            chunk_count = 0
+
+            try:
+                logger.info("[stream_generator] 在线程池中获取生成器")
+                gen = await loop.run_in_executor(executor, agent.stream_report, context)
+
+                while True:
+                    chunk = await loop.run_in_executor(
+                        executor,
+                        lambda g=gen: next(g, None)
+                    )
+
+                    if chunk is None:
+                        break
+
+                    if chunk:
+                        chunk_count += 1
+                        logger.info(f"[stream_generator] chunk #{chunk_count}: {repr(chunk[:30])}")
+                        yield chunk
+
+                logger.info(f"[stream_generator] 完成！共 {chunk_count} 个 chunk，耗时 {time.time() - stream_start:.2f}s")
+
+            except Exception as e:
+                logger.error(f"[stream_generator] 异常: {e}", exc_info=True)
+                yield f"data: [ERROR] {str(e)}\n\n"
+
+        logger.info(f"[/analyze/stream] 返回响应，准备耗时: {time.time() - start:.2f}s")
+
+        return StreamingResponse(
+            stream_generator(),
+            media_type="text/plain; charset=utf-8",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            }
+        )
+
     except Exception as e:
-        return StreamingResponse(iter([f"流处理错误: {str(e)}"]), media_type="text/plain")
+        logger.error(f"[/analyze/stream] 顶层异常: {e}", exc_info=True)
+
+        async def error_gen():
+            yield f"data: [FATAL ERROR] {str(e)}\n\n"
+
+        return StreamingResponse(
+            error_gen(),
+            media_type="text/event-stream; charset=utf-8",
+            status_code=500
+        )
+
 
 class GetScoreRequest(BaseModel):
-    dimension: str  # 仅支持“流日”
+    dimension: str
+
+
 @app.post("/get_fortune_score")
 async def get_fortune_score_api(req: GetScoreRequest):
     try:
-        return get_fortune_score(req.dimension)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(executor, get_fortune_score, req.dimension)
+        return result
     except OwnerConfigNotFound:
-        return JSONResponse(status_code=400, content={"error": "OWNER_CONFIG_NOT_FOUND", "message": "未找到命主配置，请先配置后重试"})
+        return JSONResponse(
+            status_code=400,
+            content={"error": "OWNER_CONFIG_NOT_FOUND", "message": "未找到命主配置，请先配置后重试"}
+        )
     except ValueError as ve:
         return JSONResponse(status_code=400, content={"error": str(ve)})
     except Exception as e:
+        logger.error(f"[/get_fortune_score] 错误: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# 新增：读取当前命主配置（owner.yaml）
+
 @app.get("/owner_config")
-def get_owner_config():
+async def get_owner_config():
     try:
-        cfg = load_owner_user_input()
+        loop = asyncio.get_event_loop()
+        cfg = await loop.run_in_executor(executor, load_owner_user_input)
         return {"config": cfg}
     except Exception as e:
+        logger.error(f"[/owner_config GET] 错误: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# 新增：保存命主配置（owner.yaml）
+
 @app.post("/owner_config")
 async def set_owner_config(data: dict):
     try:
-        save_owner_user_input(data)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(executor, save_owner_user_input, data)
         return {"ok": True}
     except Exception as e:
+        logger.error(f"[/owner_config POST] 错误: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# 新增：把用户输入转换为四柱（命宫配置用）
+
 @app.post("/calc_bazi")
 async def calc_bazi(req: UserInput):
     try:
-        ctx = context_builder.build_context(req)
-        # ctx.bazi 形如：“辛巳 庚子 辛酉 乙未”
+        loop = asyncio.get_event_loop()
+        ctx = await loop.run_in_executor(executor, context_builder.build_context, req)
         parts = (ctx.bazi or "").split()
         if len(parts) == 4:
             return {
@@ -140,7 +216,9 @@ async def calc_bazi(req: UserInput):
             }
         return {"bazi": ctx.bazi}
     except Exception as e:
+        logger.error(f"[/calc_bazi] 错误: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app,host="0.0.0.0",port=8000)

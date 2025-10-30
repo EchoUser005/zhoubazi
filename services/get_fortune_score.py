@@ -21,7 +21,6 @@ class OwnerConfigNotFound(Exception):
     pass
 
 
-# 单例式依赖，避免每次调用重复初始化
 _context_builder = BaziContextBuilder()
 _fortune_agent = FortuneScoreAgent()
 
@@ -102,7 +101,6 @@ def _fortune_scores(context) -> Dict[str, int]:
     return _fortune_agent.predict_scores(context, dimension="流日")
 
 if __name__ == "__main__":
-    # 方便本地快速校验业务逻辑，不依赖 FastAPI
     try:
         print("[ServiceCheck] 调用 get_fortune_score('流日') ...")
         result = get_fortune_score("流日")
