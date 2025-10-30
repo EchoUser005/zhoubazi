@@ -42,36 +42,3 @@ class AnalysisContext(BaseModel):
     """完整分析上下文，包含原始输入和计算结果"""
     user_input: UserInput  # 用户输入信息
     bazi_context: BaziContext  # 计算后的命盘上下文
-
-# 如果在__main__中，打印模型文档
-if __name__ == "__main__":
-    print("--- 数据模型说明 ---\n")
-    print("1. UserInput - 用户输入模型:")
-    print(UserInput.__doc__)
-    print("\n字段:")
-    for field_name, field in UserInput.__annotations__.items():
-        field_type = getattr(UserInput, f"__annotations__", {}).get(field_name, "")
-        print(f"  - {field_name}: {field_type}")
-    
-    print("\n2. BaziContext - 命盘上下文模型:")
-    print(BaziContext.__doc__)
-    print("\n字段:")
-    for field_name, field in BaziContext.__annotations__.items():
-        field_type = getattr(BaziContext, f"__annotations__", {}).get(field_name, "")
-        print(f"  - {field_name}: {field_type}")
-    
-    print("\n3. AnalysisContext - 完整分析上下文模型:")
-    print(AnalysisContext.__doc__)
-    
-    print("\n--- 示例数据结构 ---")
-    example_user = UserInput(
-        birth_time="2001-12-23 13:00:00",
-        birth_location="浙江省金华市", 
-        name="示例用户",
-        gender="女",
-        city="北京市",
-        is_lunar=False
-    )
-    print(f"\n用户输入示例:\n{example_user.model_dump()}")
-
-

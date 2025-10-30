@@ -9,9 +9,6 @@ def _config_path() -> str:
     return os.path.join(_project_root(), "config", "owner.yaml")
 
 def load_owner_user_input() -> Optional[Dict[str, Any]]:
-    """
-    从 config/owner.yaml 读取命主配置（与 schemas.UserInput 字段一致）
-    """
     path = _config_path()
     if not os.path.exists(path):
         return None

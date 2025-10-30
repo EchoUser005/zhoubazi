@@ -18,14 +18,11 @@ langfuse = Langfuse(
     host=os.getenv("LANGFUSE_HOST")
 )
 
-# 全局线程池
 _executor = ThreadPoolExecutor(max_workers=4)
 
 
 class LLMRouter:
-    """
-    LLM 路由器 - 使用同步 stream() + 线程池实现真正的流式
-    """
+
     def __init__(
             self,
             provider: str | None = None,

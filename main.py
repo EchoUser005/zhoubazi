@@ -70,7 +70,6 @@ async def analyze_bazi(request: UserInput):
 
 @app.post("/predict_fortune")
 async def predict_fortune(request: FortunePredictInput):
-    """运势预测打分接口 - 同步方式"""
     try:
         loop = asyncio.get_event_loop()
         base_user = UserInput(**request.model_dump(exclude={"dimension"}))
@@ -99,10 +98,6 @@ async def analyze_bazi_sse(request: UserInput):
         # logger.info(f"[/analyze/stream] 上下文构建完成，耗时 {time.time() - ctx_start:.2f}s")
 
         async def stream_generator():
-            """
-            关键：处理同步生成器（stream_report）
-            在线程池中逐块读取，实时 yield 给客户端
-            """
             logger.info("[stream_generator] 开始流式生成")
             stream_start = time.time()
             chunk_count = 0

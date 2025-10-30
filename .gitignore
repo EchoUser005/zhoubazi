@@ -11,7 +11,8 @@ venv/
 .idea/
 .qoder/
 .vscode/
-
+# prompt
+prompt/test_predict_prompt.py
 # Python cache
 __pycache__/
 *.pyc

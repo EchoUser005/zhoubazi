@@ -1,10 +1,9 @@
 
 import os
 import logging
-from typing import AsyncIterator, Optional
+from typing import Optional
 from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
-
 from schemas import BaziContext
 from utils.llm_router import LLMRouter
 
@@ -27,7 +26,6 @@ prompt_template = PromptTemplate.from_template(_template_string)
 
 
 class WeeklyFortuneAgent:
-    """周运势分析 Agent - 异步流式版本"""
 
     def __init__(
             self,
@@ -39,8 +37,8 @@ class WeeklyFortuneAgent:
             max_retries: int = 3,
     ):
         self.router = router or LLMRouter(
-            provider=provider or os.getenv("LLM_PROVIDER", "deepseek"),
-            model=model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+            provider=provider or os.getenv("LLM_PROVIDER", "gemini"),
+            model=model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
             temperature=temperature,
             timeout=timeout,
             max_retries=max_retries,
