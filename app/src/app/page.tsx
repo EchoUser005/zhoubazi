@@ -1,6 +1,7 @@
 "use client";
 
 import { Heart, Activity, Coins } from "lucide-react";
+import { API_BASE_URL } from "@/config/api";
 
 function ScoreRing({ value, label }: { value: number; label: string }) {
   const v = Math.max(0, Math.min(100, value));
@@ -41,7 +42,7 @@ export default function Home() {
     let aborted = false;
     (async () => {
       try {
-        const resp = await fetch("http://127.0.0.1:8000/get_fortune_score", {
+        const resp = await fetch(`${API_BASE_URL}/get_fortune_score`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dimension: "流日" }),

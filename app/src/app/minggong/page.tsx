@@ -14,6 +14,7 @@ import { regionData } from "element-china-area-data";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { API_BASE_URL } from "@/config/api";
 
 export default function MingGongPage() {
   // 命主配置字段
@@ -62,7 +63,7 @@ export default function MingGongPage() {
       setLoadingCfg(true);
       setCfgError(null);
       try {
-        const resp = await fetch("http://127.0.0.1:8000/owner_config");
+        const resp = await fetch(`${API_BASE_URL}/owner_config`);
         const data = await resp.json();
         if (!resp.ok) throw new Error(data?.error || "读取配置失败");
 
@@ -112,7 +113,7 @@ export default function MingGongPage() {
           }
 
           // 计算四柱
-          const calcResp = await fetch("http://127.0.0.1:8000/calc_bazi", {
+          const calcResp = await fetch(`${API_BASE_URL}/calc_bazi`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(cfg),
@@ -127,7 +128,7 @@ export default function MingGongPage() {
         }
 
         // 加载 API Keys 配置
-        const settingsResp = await fetch("http://127.0.0.1:8000/settings");
+        const settingsResp = await fetch(`${API_BASE_URL}/settings`);
         const settingsData = await settingsResp.json();
         if (settingsResp.ok) {
           setLlmProvider(settingsData.llm_provider || "gemini");
@@ -193,7 +194,7 @@ export default function MingGongPage() {
         payload.birth_time = `${format(date, "yyyy-MM-dd")} ${time}`;
       }
 
-      const resp = await fetch("http://127.0.0.1:8000/calc_bazi", {
+      const resp = await fetch(`${API_BASE_URL}/calc_bazi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -256,7 +257,7 @@ export default function MingGongPage() {
         payload.birth_time = `${format(date, "yyyy-MM-dd")} ${time}`;
       }
 
-      const resp = await fetch("http://127.0.0.1:8000/owner_config", {
+      const resp = await fetch(`${API_BASE_URL}/owner_config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -293,7 +294,7 @@ export default function MingGongPage() {
         payload.deepseek_api_key = deepseekApiKey;
       }
 
-      const resp = await fetch("http://127.0.0.1:8000/settings", {
+      const resp = await fetch(`${API_BASE_URL}/settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
