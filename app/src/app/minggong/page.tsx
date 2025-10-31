@@ -50,6 +50,12 @@ export default function MingGongPage() {
   const [loadingCfg, setLoadingCfg] = useState(true);
   const [cfgError, setCfgError] = useState<string | null>(null);
 
+  // API Keys 配置
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [deepseekApiKey, setDeepseekApiKey] = useState("");
+  const [llmProvider, setLlmProvider] = useState("gemini");
+  const [savingSettings, setSavingSettings] = useState(false);
+
   useEffect(() => {
     // 首次进入时读取 owner.yaml 并填充表单
     const loadCfg = async () => {
@@ -117,6 +123,20 @@ export default function MingGongPage() {
             setMonth(calc.month || "");
             setDay(calc.day || "");
             setHour(calc.hour || "");
+          }
+        }
+
+        // 加载 API Keys 配置
+        const settingsResp = await fetch("http://127.0.0.1:8000/settings");
+        const settingsData = await settingsResp.json();
+        if (settingsResp.ok) {
+          setLlmProvider(settingsData.llm_provider || "gemini");
+          // 不显示真实的 key，只显示占位符
+          if (settingsData.has_gemini_key) {
+            setGeminiApiKey("***已配置***");
+          }
+          if (settingsData.has_deepseek_key) {
+            setDeepseekApiKey("***已配置***");
           }
         }
       } catch (e: any) {
@@ -258,6 +278,40 @@ export default function MingGongPage() {
     }
   };
 
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const payload: any = {
+        llm_provider: llmProvider,
+      };
+
+      // 只有当输入的不是占位符时才更新
+      if (geminiApiKey && !geminiApiKey.includes("***")) {
+        payload.gemini_api_key = geminiApiKey;
+      }
+      if (deepseekApiKey && !deepseekApiKey.includes("***")) {
+        payload.deepseek_api_key = deepseekApiKey;
+      }
+
+      const resp = await fetch("http://127.0.0.1:8000/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json();
+        throw new Error(data?.error || "保存失败");
+      }
+
+      alert("API Keys 配置已保存！重启后端服务即可生效");
+    } catch (e) {
+      alert(`保存失败：${e}`);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   if (loadingCfg) {
     return (
       <main className="min-h-[calc(100vh-56px)] px-6 py-10 mx-auto max-w-4xl">
@@ -267,7 +321,72 @@ export default function MingGongPage() {
   }
 
   return (
-    <main className="min-h-[calc(100vh-56px)] px-6 py-10 mx-auto max-w-4xl">
+    <main className="min-h-[calc(100vh-56px)] px-6 py-10 mx-auto max-w-4xl space-y-6">
+      {/* API Keys 配置 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-bold">API Keys 配置</CardTitle>
+          <CardDescription>
+            配置 Gemini 和 DeepSeek 的 API Keys，保存后重启后端服务即可生效
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">LLM 提供商</h3>
+            <RadioGroup value={llmProvider} onValueChange={setLlmProvider}>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="gemini" id="provider-gemini" />
+                  <Label htmlFor="provider-gemini" className="font-normal cursor-pointer">Gemini</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="deepseek" id="provider-deepseek" />
+                  <Label htmlFor="provider-deepseek" className="font-normal cursor-pointer">DeepSeek</Label>
+                </div>
+              </div>
+            </RadioGroup>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">API Keys</h3>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label>Gemini API Key</Label>
+                <Input
+                  type="password"
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
+                  placeholder="输入 Gemini API Key"
+                />
+                <p className="text-xs text-neutral-400">
+                  如显示 "***已配置***" 表示已有配置，留空表示不修改
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>DeepSeek API Key</Label>
+                <Input
+                  type="password"
+                  value={deepseekApiKey}
+                  onChange={(e) => setDeepseekApiKey(e.target.value)}
+                  placeholder="输入 DeepSeek API Key"
+                />
+                <p className="text-xs text-neutral-400">
+                  如显示 "***已配置***" 表示已有配置，留空表示不修改
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button onClick={handleSaveSettings} disabled={savingSettings}>
+              <Save className="mr-2 h-4 w-4" />
+              {savingSettings ? "保存中..." : "保存 API Keys"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 命宫配置 */}
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold">命宫配置</CardTitle>
