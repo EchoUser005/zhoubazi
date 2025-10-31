@@ -2,7 +2,6 @@ from typing import Iterator, List, Tuple, Union, Optional, AsyncIterator
 import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from langfuse import Langfuse
 from langchain_deepseek import ChatDeepSeek
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
@@ -12,11 +11,7 @@ load_dotenv()
 
 Message = Tuple[str, str]
 Messages = List[Message]
-langfuse = Langfuse(
-    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-    host=os.getenv("LANGFUSE_HOST")
-)
+
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
