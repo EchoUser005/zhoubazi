@@ -57,17 +57,18 @@ export default function MingGongPage() {
   const [llmProvider, setLlmProvider] = useState("gemini");
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // 缓存机制：记录上次计算的参数，避免重复调用
+  const [lastCalcParams, setLastCalcParams] = useState<string | null>(null);
+
   useEffect(() => {
-    // 首次进入时读取 owner.yaml 并填充表单
+    // 首次进入时从 localStorage 读取命主信息并填充表单
     const loadCfg = async () => {
       setLoadingCfg(true);
       setCfgError(null);
       try {
-        const resp = await fetch(`${API_BASE_URL}/owner_config`);
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data?.error || "读取配置失败");
-
-        const cfg = data.config;
+        // 从 localStorage 读取
+        const stored = localStorage.getItem('owner_profile');
+        const cfg = stored ? JSON.parse(stored) : null;
         if (cfg) {
           // 填充表单字段
           setName(cfg.name || "");
@@ -164,8 +165,7 @@ export default function MingGongPage() {
     setArea("");
   };
 
-  const calcBazi = async () => {
-    setLoading(true);
+  const calcBazi = async (forceRefresh = false) => {
     try {
       // 构建payload
       const provinceLabel = regionData.find(p => p.value === province)?.label || "";
@@ -194,6 +194,16 @@ export default function MingGongPage() {
         payload.birth_time = `${format(date, "yyyy-MM-dd")} ${time}`;
       }
 
+      // 生成参数的唯一标识
+      const paramsKey = JSON.stringify(payload);
+
+      // 检查缓存：如果参数与上次相同且不是强制刷新，则跳过 API 调用
+      if (!forceRefresh && paramsKey === lastCalcParams) {
+        console.log("[calcBazi] 参数未变化，使用缓存结果，跳过 API 调用");
+        return;
+      }
+
+      setLoading(true);
       const resp = await fetch(`${API_BASE_URL}/calc_bazi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,6 +217,9 @@ export default function MingGongPage() {
       setMonth(data.month || "");
       setDay(data.day || "");
       setHour(data.hour || "");
+
+      // 更新缓存键
+      setLastCalcParams(paramsKey);
     } catch (e) {
       alert(`计算失败：${e}`);
     } finally {
@@ -257,18 +270,10 @@ export default function MingGongPage() {
         payload.birth_time = `${format(date, "yyyy-MM-dd")} ${time}`;
       }
 
-      const resp = await fetch(`${API_BASE_URL}/owner_config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      // 保存到 localStorage（而不是后端）
+      localStorage.setItem('owner_profile', JSON.stringify(payload));
 
-      if (!resp.ok) {
-        const data = await resp.json();
-        throw new Error(data?.error || "保存失败");
-      }
-
-      alert("保存成功！配置已更新到 config/owner.yaml");
+      alert("保存成功！配置已保存到浏览器本地");
 
       // 重新计算四柱
       await calcBazi();
@@ -392,7 +397,7 @@ export default function MingGongPage() {
         <CardHeader>
           <CardTitle className="text-2xl font-bold">命宫配置</CardTitle>
           <CardDescription>
-            配置您的命盘信息，保存后将用于首页三维运势预测。配置将保存到 config/owner.yaml 文件。
+            配置您的命盘信息，保存后将用于首页三维运势预测。配置将保存到浏览器本地存储。
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6">
@@ -610,7 +615,7 @@ export default function MingGongPage() {
 
           {/* 操作按钮 */}
           <div className="flex gap-3">
-            <Button onClick={calcBazi} disabled={loading} variant="outline">
+            <Button onClick={() => calcBazi(true)} disabled={loading} variant="outline">
               <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
               {loading ? "计算中..." : "计算四柱"}
             </Button>

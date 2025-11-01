@@ -19,13 +19,11 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={`${inter.className} bg-black text-white`}>
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 px-6 py-6">
-            {children}
-            <Toaster richColors />
-          </main>
-        </div>
+        <Sidebar />
+        <main className="md:ml-16 min-h-screen px-6 py-6">
+          {children}
+          <Toaster richColors />
+        </main>
       </body>
     </html>
   );

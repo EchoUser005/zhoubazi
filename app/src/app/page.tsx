@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Heart, Activity, Coins } from "lucide-react";
 import { API_BASE_URL } from "@/config/api";
 
@@ -37,15 +39,35 @@ function ScoreRing({ value, label }: { value: number; label: string }) {
 
 export default function Home() {
   const [scores, setScores] = useState({ emotion: 55, health: 82, wealth: 68 }); // 默认 mock，接口成功后覆盖
+  const [ownerProfile, setOwnerProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 从 localStorage 读取命主信息
+    try {
+      const stored = localStorage.getItem('owner_profile');
+      if (stored) {
+        setOwnerProfile(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn("[localStorage] 读取命主信息失败:", e);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (loading || !ownerProfile) return; // 没有命主信息时不调用接口
+
     let aborted = false;
     (async () => {
       try {
         const resp = await fetch(`${API_BASE_URL}/get_fortune_score`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dimension: "流日" }),
+          body: JSON.stringify({
+            dimension: "流日",
+            owner: ownerProfile  // 传入命主信息
+          }),
         });
         if (!resp.ok) {
           console.warn("[score] http error:", resp.status);
@@ -61,7 +83,7 @@ export default function Home() {
       }
     })();
     return () => { aborted = true; };
-  }, []);
+  }, [loading, ownerProfile]);
   const statuses = [
     { title: "运势上升", desc: "今日整体运势呈上升趋势，适合开展新项目。" },
     { title: "情感和谐", desc: "人际关系融洽，适合沟通交流。" },
@@ -75,6 +97,34 @@ export default function Home() {
 
   return (
     <main className="min-h-[calc(100vh-56px)] px-6 py-10 mx-auto max-w-6xl">
+      {/* 未配置提示 */}
+      {!loading && !ownerProfile && (
+        <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-amber-500 mb-1">未配置命盘信息</h3>
+              <p className="text-sm text-neutral-400 mb-3">
+                为了获得准确的运势预测，请先配置您的命盘信息（姓名、出生时间、出生地点等）。
+              </p>
+              <Link
+                href="/minggong"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-black rounded-lg font-medium hover:bg-amber-400 transition-colors text-sm"
+              >
+                <span>前往配置</span>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 左：三维运势评分 */}
         <section className="lg:col-span-2 rounded-2xl border border-neutral-800 bg-black/30 p-5">
@@ -163,5 +213,3 @@ export default function Home() {
     </main>
   );
 }
-
-import { useEffect, useState } from "react";

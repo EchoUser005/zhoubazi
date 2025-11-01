@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import sxtwl
-from geopy.geocoders import Nominatim
+import requests
+from functools import lru_cache
 
 """
 日历计算工具
@@ -8,7 +9,7 @@ from geopy.geocoders import Nominatim
 1. 公历转农历
 2. 农历转公历
 3. 获取今日干支历 (如：乙巳年壬午月甲申日)
-4. 地理位置查经纬度
+4. 地理位置查经纬度（使用高德地图API，带缓存）
 5. 真太阳时计算获得校准后生辰
 6. 未来日历生成 (获取近n周干支历，假设今天是6月9日周一，则获取6月9日-6月22日干支历)
 7. 四柱排盘
@@ -22,8 +23,8 @@ class BaziEngine:
         """初始化引擎"""
         self.TIAN_GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
         self.DI_ZHI = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-        # 初始化地理位置查询器，并设置更长的超时时间（10秒）
-        self.geolocator = Nominatim(user_agent="bazi_analyzer_app/1.0", timeout=10, proxies=None)  # type: ignore
+        # 高德地图API Key
+        self.amap_key = "a33717c5f9e32f75631a1a14011554ff"
 
     # 1. 公历转农历
     def convert_solar_to_lunar(self, solar_date: datetime) -> dict:
@@ -89,16 +90,35 @@ class BaziEngine:
             "day_zhi": day_zhi
         }
 
-    # 4. 地理位置查经纬度
+    # 4. 地理位置查经纬度（使用高德地图API，带LRU缓存）
+    @lru_cache(maxsize=500)
     def get_location_info(self, city_name: str) -> tuple[float, float]:
-        """输入城市名，利用geopy查询经纬度。如果找不到则抛出ValueError。"""
+        """
+        输入城市名，调用高德地图API查询经纬度。如果找不到则抛出ValueError。
+        使用LRU缓存避免重复查询相同城市。
+        """
         try:
-            location = self.geolocator.geocode(city_name)
-            if location is None:
-                raise ValueError(f"无法找到地理位置: '{city_name}'")
-            return location.longitude, location.latitude  # type: ignore
+            url = "https://restapi.amap.com/v3/geocode/geo"
+            params = {
+                "address": city_name,
+                "key": self.amap_key
+            }
+            response = requests.get(url, params=params, timeout=5)
+            response.raise_for_status()
+
+            data = response.json()
+
+            if data.get("status") == "1" and data.get("geocodes"):
+                location = data["geocodes"][0]["location"]
+                lng, lat = location.split(",")
+                return float(lng), float(lat)
+            else:
+                error_msg = data.get("info", "未知错误")
+                raise ValueError(f"无法找到地理位置 '{city_name}': {error_msg}")
+
+        except requests.RequestException as e:
+            raise ValueError(f"地理位置查询网络错误: {e}")
         except Exception as e:
-            # 捕获所有geopy可能抛出的异常，并统一向上抛出
             raise ValueError(f"地理位置查询失败: {e}")
 
     # 5. 真太阳时计算

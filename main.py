@@ -10,7 +10,6 @@ from agents.weekly_fortune_agent import WeeklyFortuneAgent
 from pydantic import BaseModel
 from agents.fortune_score_agent import FortuneScoreAgent
 from services.get_fortune_score import get_fortune_score, OwnerConfigNotFound
-from utils.config_loader import load_owner_user_input, save_owner_user_input
 from utils.settings_manager import load_settings, save_settings
 import logging
 import time
@@ -141,9 +140,10 @@ async def analyze_bazi_sse(request: UserInput):
 
     except Exception as e:
         logger.error(f"[/analyze/stream] 顶层异常: {e}", exc_info=True)
+        error_msg = str(e)
 
         async def error_gen():
-            yield f"data: [FATAL ERROR] {str(e)}\n\n"
+            yield f"data: [FATAL ERROR] {error_msg}\n\n"
 
         return StreamingResponse(
             error_gen(),
@@ -154,13 +154,15 @@ async def analyze_bazi_sse(request: UserInput):
 
 class GetScoreRequest(BaseModel):
     dimension: str
+    owner: dict | None = None  # 新增：前端传来的命主信息（可选，用于向后兼容）
 
 
 @app.post("/get_fortune_score")
 async def get_fortune_score_api(req: GetScoreRequest):
     try:
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(executor, get_fortune_score, req.dimension)
+        # 传入 owner 数据
+        result = await loop.run_in_executor(executor, get_fortune_score, req.dimension, req.owner)
         return result
     except OwnerConfigNotFound:
         return JSONResponse(
@@ -171,28 +173,6 @@ async def get_fortune_score_api(req: GetScoreRequest):
         return JSONResponse(status_code=400, content={"error": str(ve)})
     except Exception as e:
         logger.error(f"[/get_fortune_score] 错误: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.get("/owner_config")
-async def get_owner_config():
-    try:
-        loop = asyncio.get_event_loop()
-        cfg = await loop.run_in_executor(executor, load_owner_user_input)
-        return {"config": cfg}
-    except Exception as e:
-        logger.error(f"[/owner_config GET] 错误: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@app.post("/owner_config")
-async def set_owner_config(data: dict):
-    try:
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(executor, save_owner_user_input, data)
-        return {"ok": True}
-    except Exception as e:
-        logger.error(f"[/owner_config POST] 错误: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 

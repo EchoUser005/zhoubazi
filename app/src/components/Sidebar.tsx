@@ -24,13 +24,13 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex md:flex-col w-16 shrink-0 border-r border-neutral-900/70 bg-black">
+    <aside className="hidden md:flex md:flex-col w-16 shrink-0 border-r border-neutral-900/70 bg-black fixed left-0 top-0 h-screen z-50">
       <div className="h-14 flex items-center justify-center border-b border-neutral-900/70">
         <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center text-xs font-bold">
           N
         </div>
       </div>
-      <nav className="flex-1 py-4 flex flex-col gap-2 items-center">
+      <nav className="flex-1 py-4 flex flex-col gap-2 items-center overflow-y-auto">
         {items.map(({ href, icon: Icon, label }) => {
           const active =
             pathname === href || (href !== "/" && pathname?.startsWith(href));

@@ -12,7 +12,6 @@ from typing import Dict, Any
 from prompt.context_builder import BaziContextBuilder
 from agents.fortune_score_agent import FortuneScoreAgent
 from schemas import UserInput
-from utils.config_loader import load_owner_user_input
 from db.db_manager import db as scores_repo
 
 
@@ -38,14 +37,15 @@ def _today_key() -> str:
         return datetime.now().strftime("%Y-%m-%d")
 
 
-def get_fortune_score(dimension: str) -> Dict[str, Any]:
+def get_fortune_score(dimension: str, owner_data: Dict[str, Any] | None = None) -> Dict[str, Any]:
     """
     应用服务入口：获取三维评分（情感/健康/财富）
     - 先查评分库，命中直接返回（source=db）
-    - 未命中则读取命主配置 → 构建上下文 → 调用算法 → 入库 → 返回（source=model）
+    - 未命中则使用传入的命主数据 → 构建上下文 → 调用算法 → 入库 → 返回（source=model）
 
     入参：
         dimension: 仅支持 '流日'
+        owner_data: 命主信息（从前端 localStorage 传来），如果为 None 则降级读取配置文件
     返回：
         {
           "result": {"emotion": int, "health": int, "wealth": int},
@@ -53,8 +53,8 @@ def get_fortune_score(dimension: str) -> Dict[str, Any]:
           "key": "YYYY-MM-DD"
         }
     异常：
-        ValueError: 维度非法
-        OwnerConfigNotFound: 未配置命主（config/owner.yaml）
+        ValueError: 维度非法或缺少命主信息
+        OwnerConfigNotFound: 未配置命主（仅当 owner_data 为 None 且配置文件不存在时）
         其他异常：向上抛出交由路由层统一处理
     """
     dim = (dimension or "").strip()
@@ -76,10 +76,11 @@ def get_fortune_score(dimension: str) -> Dict[str, Any]:
             "key": key,
         }
 
-    # 2) 未命中 → 读取命主配置
-    owner_cfg = load_owner_user_input()
-    if not owner_cfg:
-        # 交由路由层返回 400 + 友好消息
+    # 2) 未命中 → 使用传入的命主数据（优先）或读取配置文件（降级）
+    if owner_data:
+        # 前端传来的数据（推荐方式）
+        owner_cfg = owner_data
+    else:
         raise OwnerConfigNotFound("OWNER_CONFIG_NOT_FOUND")
 
     # 3) 构建上下文 → 调用算法（流日干支注入在 Agent 内部处理）
