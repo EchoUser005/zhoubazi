@@ -1,25 +1,67 @@
 # Environments
 .env
+.env.local
 .venv
 claude-code-router/
 env/
 venv/
+
+# Configuration files (sensitive data)
+config/owner.yaml
+config/settings.yaml
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+db/*.db
+db/*.sqlite
+db/*.sqlite3
+
+# Log files
+*.log
+app.log
+nohup.out
 
 # IDE / Editor specific
 .vscode/
 .claude
 .idea/
 .qoder/
-# prompt
-prompt/test_predict_prompt.py
+
 # Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
 
 # Distribution / packaging
 build/
 dist/
-*.egg-info/ 
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend (Next.js)
+app/node_modules/
+app/.next/
+app/out/
+app/.env.local
+app/.env.development.local
+app/.env.test.local
+app/.env.production.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Project specific
+prompt/test_predict_prompt.py
 
 # Project documentation (private)
 prd.md
