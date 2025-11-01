@@ -101,7 +101,7 @@ class BaziContextBuilder:
         qiyun_time = f"出生后{qiyun_data['year']}年{qiyun_data['month']}月{qiyun_data['day']}日 上大运"
         
         jiaoyun_data = dayun_info['jiaoyun_data']
-        jiaoyun_time = f"逢丙、辛年 {jiaoyun_data['year']}年{jiaoyun_data['month']}月交大运"
+        jiaoyun_time = f"{jiaoyun_data['year']}年{jiaoyun_data['month']}月交大运"
         
         return BaziContext(
             nowtime=nowtime_month,
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         gender="女",
         isTai=False,
         city="北京",
-        is_lunar=False # 为测试用例添加新字段
+        is_lunar=False
     )
     
     builder = BaziContextBuilder()

@@ -23,12 +23,10 @@ class BaziEngine:
         """初始化引擎"""
         self.TIAN_GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
         self.DI_ZHI = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-        # 高德地图API Key
         self.amap_key = "a33717c5f9e32f75631a1a14011554ff"
 
     # 1. 公历转农历
     def convert_solar_to_lunar(self, solar_date: datetime) -> dict:
-        """输入公历datetime对象，返回农历信息字典"""
         day = sxtwl.fromSolar(solar_date.year, solar_date.month, solar_date.day)
 
         # 农历月名称 (修正版本)
@@ -57,13 +55,11 @@ class BaziEngine:
     # 2. 农历转公历
     def convert_lunar_to_solar(self, lunar_year: int, lunar_month: int, lunar_day: int,
                                is_leap: bool = False) -> datetime:
-        """输入农历年月日和是否闰月，返回公历datetime对象"""
         day = sxtwl.fromLunar(lunar_year, lunar_month, lunar_day, is_leap)
         return datetime(day.getSolarYear(), day.getSolarMonth(), day.getSolarDay())
 
     # 3. 干支查询
     def get_ganzhi_info(self, solar_date: datetime) -> dict:
-        """输入公历datetime对象，返回年月日干支及其他信息"""
         day = sxtwl.fromSolar(solar_date.year, solar_date.month, solar_date.day)
 
         year_gz = day.getYearGZ()
@@ -93,10 +89,7 @@ class BaziEngine:
     # 4. 地理位置查经纬度（使用高德地图API，带LRU缓存）
     @lru_cache(maxsize=500)
     def get_location_info(self, city_name: str) -> tuple[float, float]:
-        """
-        输入城市名，调用高德地图API查询经纬度。如果找不到则抛出ValueError。
-        使用LRU缓存避免重复查询相同城市。
-        """
+
         try:
             url = "https://restapi.amap.com/v3/geocode/geo"
             params = {
@@ -247,35 +240,21 @@ class BaziEngine:
         }
 
     def calculate_dayun(self, birth_time: datetime, gender: str, city_name: str) -> dict:
-        """
-        输入生日、性别、城市，计算大运信息 (V4.0 最终修正版)
 
-        修正说明:
-        1.  【修复致命错误】修正了大运干支排列的逻辑。第一步大运的偏移量应为1，
-            而不是0。已将循环中的偏移量从 `i` 修正为 `i + 1`。
-        2.  【确保精度】保留使用 sxtwl 库的精确节气时间来计算起运时间，
-            结果精确到天。
-        3.  【确保命理正确】保留对“早子时”的正确处理，确保所有十神关系
-            都基于校准后的正确日主天干进行计算。
-        """
         longitude, _ = self.get_location_info(city_name)
         true_solar_time = self.get_true_solar_time(birth_time, longitude)
 
         # 步骤1: 获取经过“早子时”校准后的正确八字
         bazi_info = self._calculate_bazi_from_tst(true_solar_time)
 
-        # 步骤2: 确定正确的日主天干，这是计算十神的基础
         day_master_gan_str = bazi_info['day_pillar'][0]
         day_gan_index = self.TIAN_GAN.index(day_master_gan_str)
 
-        # 步骤3: 确定大运顺逆
-        # 使用未经校准的原始时间获取年柱，因为年柱划分依然看立春
         original_day = sxtwl.fromSolar(true_solar_time.year, true_solar_time.month, true_solar_time.day)
         year_gz = original_day.getYearGZ()
         py_gender = 1 if gender == "男" else 0
         is_forward = (year_gz.tg % 2 == 0 and py_gender == 1) or (year_gz.tg % 2 != 0 and py_gender == 0)
 
-        # 步骤4: 精确计算起运时间
         # "节"的索引: 立春(3), 惊蛰(5), 清明(7), 立夏(9), 芒种(11), 小暑(13), 立秋(15), 白露(17), 寒露(19), 立冬(21), 大雪(23), 小寒(1)
         JIE_INDEXES = {1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23}
 
@@ -300,7 +279,6 @@ class BaziEngine:
                     break
                 temp_day = temp_day.before(1)
 
-        # 使用sxtwl将节气日转换为精确的儒略日（JD），再转回公历datetime对象
         jd = jieqi_day.getJieQiJD()
         jieqi_time_info = sxtwl.JD2DD(jd)
         jieqi_datetime = datetime(
@@ -310,7 +288,6 @@ class BaziEngine:
 
         time_diff = abs(jieqi_datetime - true_solar_time)
 
-        # 3天为1岁，即1天为4个月，1小时为5天
         days_diff = time_diff.total_seconds() / (3600 * 24)
 
         # 计算起运岁数

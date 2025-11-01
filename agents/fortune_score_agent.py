@@ -11,7 +11,6 @@ from schemas import BaziContext
 from utils.prompt_utils import load_prompt_split
 from utils.llm_router import LLMRouter
 
-# 加载环境变量（支持 GEMINI_API_KEY / GOOGLE_API_KEY）
 load_dotenv()
 
 
