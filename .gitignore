@@ -1,5 +1,5 @@
 # Environments
-utils/.env
+.env
 .venv
 claude-code-router/
 env/
@@ -10,7 +10,6 @@ venv/
 .claude
 .idea/
 .qoder/
-.vscode/
 # prompt
 prompt/test_predict_prompt.py
 # Python cache
