@@ -20,7 +20,7 @@
 ### 1. 克隆代码库
 
 ```bash
-git clone <项目地址>
+git clone https://github.com/EchoUser005/zhoubazi
 cd zhoubazi
 ```
 
@@ -76,22 +76,9 @@ cd ..
 
 ## 运行项目
 
-### 启动后端
-
 ```bash
-python main.py
+python -m run
 ```
-
-后端运行在 http://localhost:8000
-
-### 启动前端（新开一个终端）
-
-```bash
-cd app
-npm run dev
-```
-
-前端运行在 http://localhost:3000
 
 打开浏览器访问 http://localhost:3000 即可使用应用。
 
