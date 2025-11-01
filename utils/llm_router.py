@@ -5,9 +5,18 @@ from concurrent.futures import ThreadPoolExecutor
 from langchain_deepseek import ChatDeepSeek
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
+
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+# 导入配置管理器
+try:
+    from utils.settings_manager import get_api_key
+    HAS_SETTINGS_MANAGER = True
+except ImportError:
+    HAS_SETTINGS_MANAGER = False
+    logger.warning("settings_manager not found, using env vars only")
 
 Message = Tuple[str, str]
 Messages = List[Message]
@@ -30,6 +39,18 @@ class LLMRouter:
         self.temperature = temperature
         self.timeout = timeout
         self.max_retries = max_retries
+
+        # 从配置文件获取 API key（优先级高于环境变量）
+        if HAS_SETTINGS_MANAGER:
+            if self.provider == "deepseek":
+                api_key = get_api_key("deepseek")
+                if api_key:
+                    os.environ["DEEPSEEK_API_KEY"] = api_key
+            elif self.provider == "gemini":
+                api_key = get_api_key("gemini")
+                if api_key:
+                    os.environ["GEMINI_API_KEY"] = api_key
+                    os.environ["GOOGLE_API_KEY"] = api_key  # langchain 可能用这个
 
         if self.provider == "deepseek":
             self.model = model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")

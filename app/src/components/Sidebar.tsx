@@ -17,7 +17,7 @@ const items = [
   { href: "/dialog", icon: MessageSquare, label: "灵讯" },
   { href: "/timeline", icon: Calendar, label: "时运卷轴" },
   { href: "/vault", icon: Boxes, label: "万象匣" },
-  { href: "/palace", icon: User, label: "命宫" },
+  { href: "/minggong", icon: User, label: "命宫" },
 ];
 
 export default function Sidebar() {

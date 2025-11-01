@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { regionData, codeToText } from "element-china-area-data";
 import type { HistoryEntry } from "@/features/lingxun/types";
+import { API_BASE_URL } from "@/config/api";
 
 export function useLingxun() {
   const [name, setName] = useState("");
@@ -141,7 +142,7 @@ export function useLingxun() {
     try {
       console.log("[handleAnalysis] 开始请求");
 
-      const response = await fetch("http://127.0.0.1:8000/analyze/stream", {
+      const response = await fetch(`${API_BASE_URL}/analyze/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

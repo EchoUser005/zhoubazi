@@ -67,3 +67,7 @@ prompt/test_predict_prompt.py
 prd.md
 trd.md
 CLAUDE.md
+# 数据库文件
+db/*.sqlite3
+*.db
+*.sqlite

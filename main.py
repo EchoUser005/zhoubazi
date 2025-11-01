@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from agents.fortune_score_agent import FortuneScoreAgent
 from services.get_fortune_score import get_fortune_score, OwnerConfigNotFound
 from utils.config_loader import load_owner_user_input, save_owner_user_input
+from utils.settings_manager import load_settings, save_settings
 import logging
 import time
 
@@ -212,6 +213,50 @@ async def calc_bazi(req: UserInput):
         return {"bazi": ctx.bazi}
     except Exception as e:
         logger.error(f"[/calc_bazi] 错误: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/settings")
+async def get_settings():
+    """获取系统配置（API keys 等）"""
+    try:
+        loop = asyncio.get_event_loop()
+        settings = await loop.run_in_executor(executor, load_settings)
+        # 隐藏敏感信息，只返回是否已配置
+        return {
+            "gemini_api_key": "***" if settings.get("gemini_api_key") else "",
+            "deepseek_api_key": "***" if settings.get("deepseek_api_key") else "",
+            "llm_provider": settings.get("llm_provider", "gemini"),
+            "has_gemini_key": bool(settings.get("gemini_api_key")),
+            "has_deepseek_key": bool(settings.get("deepseek_api_key")),
+        }
+    except Exception as e:
+        logger.error(f"[/settings GET] 错误: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/settings")
+async def update_settings(data: dict):
+    """更新系统配置"""
+    try:
+        loop = asyncio.get_event_loop()
+        # 读取现有配置
+        settings = await loop.run_in_executor(executor, load_settings)
+
+        # 更新配置
+        if "gemini_api_key" in data:
+            settings["gemini_api_key"] = data["gemini_api_key"]
+        if "deepseek_api_key" in data:
+            settings["deepseek_api_key"] = data["deepseek_api_key"]
+        if "llm_provider" in data:
+            settings["llm_provider"] = data["llm_provider"]
+
+        # 保存配置
+        await loop.run_in_executor(executor, save_settings, settings)
+
+        return {"ok": True, "message": "配置已保存"}
+    except Exception as e:
+        logger.error(f"[/settings POST] 错误: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
