@@ -70,12 +70,20 @@ class BaziContextBuilder:
             time_str = user_info.birth_time if user_info.birth_time else "12:00:00"
 
             birth_time_str = f"{lunar_date.strftime('%Y-%m-%d')} {time_str}"
-            birth_time = datetime.strptime(birth_time_str, '%Y-%m-%d %H:%M:%S')
+            # 兼容两种时间格式
+            try:
+                birth_time = datetime.strptime(birth_time_str, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                birth_time = datetime.strptime(birth_time_str, '%Y-%m-%d %H:%M')
         else:
             # 保持原有逻辑，处理公历日期
             if not user_info.birth_time:
                 raise ValueError("公历出生时间 (birth_time) 未提供。")
-            birth_time = datetime.strptime(user_info.birth_time, '%Y-%m-%d %H:%M:%S')
+            # 兼容两种时间格式
+            try:
+                birth_time = datetime.strptime(user_info.birth_time, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                birth_time = datetime.strptime(user_info.birth_time, '%Y-%m-%d %H:%M')
 
         current_time = self.engine.get_timenow()
         current_ganzhi = self.engine.get_ganzhi_info(current_time)
@@ -135,7 +143,7 @@ if __name__ == "__main__":
     
     builder = BaziContextBuilder()
     
-    # 测试get_calendare方法
+    # 测试get_calendar方法
     print("\n1. get_calendar 方法测试:")
     calendar = builder.get_calendar()
     print(f"未来两周日历:\n{calendar}")

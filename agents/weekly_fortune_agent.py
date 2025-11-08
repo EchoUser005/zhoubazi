@@ -37,8 +37,8 @@ class WeeklyFortuneAgent:
             max_retries: int = 3,
     ):
         self.router = router or LLMRouter(
-            provider=provider or os.getenv("LLM_PROVIDER", "gemini"),
-            model=model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            provider=provider or os.getenv("LLM_PROVIDER", "deepseek"),# gemini
+            model=model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),# gemini-2.5-flash
             temperature=temperature,
             timeout=timeout,
             max_retries=max_retries,

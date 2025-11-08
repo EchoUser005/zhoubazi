@@ -30,7 +30,7 @@ def run():
     Runs both the FastAPI backend and the Next.js frontend concurrently.
     """
     backend_command = [sys.executable, "main.py"]
-    frontend_command = "npm run dev"
+    frontend_command = "npm run build && npm start"
 
     app_dir = os.path.join(os.path.dirname(__file__), 'app')
 

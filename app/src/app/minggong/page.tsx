@@ -26,7 +26,7 @@ export default function MingGongPage() {
 
   // 公历输入
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [time, setTime] = useState("12:00:00");
+  const [time, setTime] = useState("12:00");
 
   // 农历输入
   const [lunarYear, setLunarYear] = useState("");
@@ -191,7 +191,9 @@ export default function MingGongPage() {
           alert("请选择出生日期");
           return;
         }
-        payload.birth_time = `${format(date, "yyyy-MM-dd")} ${time}`;
+        // 确保时间格式包含秒（兼容不同浏览器）
+        const timeWithSeconds = time.split(':').length === 2 ? `${time}:00` : time;
+        payload.birth_time = `${format(date, "yyyy-MM-dd")} ${timeWithSeconds}`;
       }
 
       // 生成参数的唯一标识
@@ -267,7 +269,9 @@ export default function MingGongPage() {
           alert("请选择出生日期");
           return;
         }
-        payload.birth_time = `${format(date, "yyyy-MM-dd")} ${time}`;
+        // 确保时间格式包含秒（兼容不同浏览器）
+        const timeWithSeconds = time.split(':').length === 2 ? `${time}:00` : time;
+        payload.birth_time = `${format(date, "yyyy-MM-dd")} ${timeWithSeconds}`;
       }
 
       // 保存到 localStorage（而不是后端）
@@ -500,7 +504,7 @@ export default function MingGongPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>出生时间</Label>
-                  <Input type="time" step="1" value={time} onChange={(e) => setTime(e.target.value)} />
+                  <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
                 </div>
               </div>
             ) : (
