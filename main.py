@@ -1,6 +1,5 @@
 import asyncio
 import uvicorn
-from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,8 +23,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-executor = ThreadPoolExecutor(max_workers=4)
 
 app = FastAPI(
     title="周运势分析API",
@@ -90,31 +87,15 @@ async def analyze_bazi_sse(request: UserInput):
         logger.info("[/analyze/stream] 请求开始")
         start = time.time()
 
-        loop = asyncio.get_event_loop()
-
-        # logger.info("[/analyze/stream] 开始构建上下文")
-        # ctx_start = time.time()
-        context = await loop.run_in_executor(executor, context_builder.build_context, request)
-        # logger.info(f"[/analyze/stream] 上下文构建完成，耗时 {time.time() - ctx_start:.2f}s")
+        context = context_builder.build_context(request)
 
         async def stream_generator():
-            logger.info("[stream_generator] 开始流式生成")
+            logger.info("[stream_generator] 开始生成")
             stream_start = time.time()
             chunk_count = 0
 
             try:
-                logger.info("[stream_generator] 在线程池中获取生成器")
-                gen = await loop.run_in_executor(executor, agent.stream_report, context)
-
-                while True:
-                    chunk = await loop.run_in_executor(
-                        executor,
-                        lambda g=gen: next(g, None)
-                    )
-
-                    if chunk is None:
-                        break
-
+                async for chunk in agent.astream_report(context):
                     if chunk:
                         chunk_count += 1
                         logger.info(f"[stream_generator] chunk #{chunk_count}: {repr(chunk[:30])}")
@@ -154,7 +135,7 @@ async def analyze_bazi_sse(request: UserInput):
 
 class GetScoreRequest(BaseModel):
     dimension: str
-    owner: dict | None = None  # 新增：前端传来的命主信息（可选，用于向后兼容）
+    owner: dict | None = None
 
 
 @app.post("/get_fortune_score")
@@ -162,7 +143,7 @@ async def get_fortune_score_api(req: GetScoreRequest):
     try:
         loop = asyncio.get_event_loop()
         # 传入 owner 数据
-        result = await loop.run_in_executor(executor, get_fortune_score, req.dimension, req.owner)
+        result = await loop.run_in_executor(None, get_fortune_score, req.dimension, req.owner)
         return result
     except OwnerConfigNotFound:
         return JSONResponse(
@@ -180,7 +161,7 @@ async def get_fortune_score_api(req: GetScoreRequest):
 async def calc_bazi(req: UserInput):
     try:
         loop = asyncio.get_event_loop()
-        ctx = await loop.run_in_executor(executor, context_builder.build_context, req)
+        ctx = await loop.run_in_executor(None, context_builder.build_context, req)
         parts = (ctx.bazi or "").split()
         if len(parts) == 4:
             return {
@@ -201,7 +182,7 @@ async def get_settings():
     """获取系统配置（API keys 等）"""
     try:
         loop = asyncio.get_event_loop()
-        settings = await loop.run_in_executor(executor, load_settings)
+        settings = await loop.run_in_executor(None, load_settings)
         # 隐藏敏感信息，只返回是否已配置
         return {
             "gemini_api_key": "***" if settings.get("gemini_api_key") else "",
@@ -221,7 +202,7 @@ async def update_settings(data: dict):
     try:
         loop = asyncio.get_event_loop()
         # 读取现有配置
-        settings = await loop.run_in_executor(executor, load_settings)
+        settings = await loop.run_in_executor(None, load_settings)
 
         # 更新配置
         if "gemini_api_key" in data:
@@ -232,7 +213,7 @@ async def update_settings(data: dict):
             settings["llm_provider"] = data["llm_provider"]
 
         # 保存配置
-        await loop.run_in_executor(executor, save_settings, settings)
+        await loop.run_in_executor(None, save_settings, settings)
 
         return {"ok": True, "message": "配置已保存"}
     except Exception as e:

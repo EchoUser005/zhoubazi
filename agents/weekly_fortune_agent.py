@@ -60,11 +60,16 @@ class WeeklyFortuneAgent:
         )
         user_message = "请严格按照规则所示的输出格式生成分析报告，不要输出任何无关字符"
         return [("system", system_message), ("human", user_message)]
-
+# 非流式同步
     def generate_report(self, context: BaziContext) -> str:
         messages = self._build_messages(context)
         return self.router.invoke(messages)
-
+# 流式同步
     def stream_report(self, context):
         messages = self._build_messages(context)
         return self.router.stream(messages)
+# 流式异步
+    async def astream_report(self, context):
+        messages = self._build_messages(context)
+        async for chunk in self.router.astream(messages):
+            yield chunk

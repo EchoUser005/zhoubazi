@@ -1,7 +1,6 @@
 from typing import Iterator, List, Tuple, Union, Optional, AsyncIterator
 import os
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from langchain_deepseek import ChatDeepSeek
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
@@ -10,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# 导入配置管理器
 try:
     from utils.settings_manager import get_api_key
     HAS_SETTINGS_MANAGER = True
@@ -20,9 +18,6 @@ except ImportError:
 
 Message = Tuple[str, str]
 Messages = List[Message]
-
-
-_executor = ThreadPoolExecutor(max_workers=4)
 
 
 class LLMRouter:
@@ -86,6 +81,14 @@ class LLMRouter:
         logger.info(f"[stream] model={self.model}")
         for chunk in self.llm.stream(msgs):
             logger.debug(f"[stream] chunk type: {type(chunk)}, content: {str(chunk)[:100]}")
+            if hasattr(chunk, "content") and isinstance(chunk.content, str):
+                yield chunk.content
+
+    async def astream(self, messages):
+        msgs = self._normalize_messages(messages)
+        logger.info(f"[astream] model={self.model}")
+        async for chunk in self.llm.astream(msgs):
+            logger.debug(f"[astream] chunk type: {type(chunk)}, content: {str(chunk)[:100]}")
             if hasattr(chunk, "content") and isinstance(chunk.content, str):
                 yield chunk.content
 
